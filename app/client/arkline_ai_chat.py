@@ -30,67 +30,58 @@ llm = ChatGroq(
     max_tokens=1000
 )
 
+class ArklineAIChat:
+    def __init__(self):
+        self.embedding = embedding
+        self.llm = llm
+        self.file_name = file_name
+        self.vectorstore = None
 
-# ========== Document → Chroma Vectorstore ==========
-def process_document_to_chroma_db(file_path):
-    # Check if vectorstore already exists
-    vectorstore_path = f"{working_dir}/doc_vectorstore"
-    if os.path.exists(vectorstore_path):
-        print("Vectorstore already exists. Skipping document processing.")
-        return Chroma(persist_directory=vectorstore_path, embedding_function=embedding)
+    def process_document(self):
+        if not os.path.exists(self.file_name):
+            raise FileNotFoundError(f"Document {self.file_name} not found.")
+        
+        # Load the document
+        loader = PDFPlumberLoader(self.file_name)
+        documents = loader.load()
 
-    # Load the document
-    loader = PDFPlumberLoader(file_path)
-    documents = loader.load()
+        # Split the document into chunks
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=200)
+        texts = text_splitter.split_documents(documents)
 
-    # Split the document into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=200)
-    texts = text_splitter.split_documents(documents)
+        # Create and persist the vectorstore
+        self.vectorstore = Chroma.from_documents(
+            documents=texts,
+            embedding=self.embedding,
+            persist_directory=f"{working_dir}/doc_vectorstore"
+        )
+    
+    def answer_question(self, user_question):
+        if not self.vectorstore:
+            raise ValueError("Vectorstore is not initialized. Call process_document first.")
+        
+        retriever = self.vectorstore.as_retriever()
 
-    # Process chunks in parallel to create embeddings
-    def process_chunk(chunk):
-        return embedding.embed_documents([chunk])
+        # Compose LCEL chain
+        rag_chain = (
+            RunnableMap({
+                "context": lambda x: retriever.invoke(x["question"]),
+                "question": lambda x: x["question"]
+            })
+            | prompt_template
+            | self.llm
+            | StrOutputParser()
+        )
 
-    with ThreadPoolExecutor() as executor:
-        embeddings = list(executor.map(process_chunk, texts))
-
-    # Create and persist the vectorstore
-    vectordb = Chroma.from_documents(
-        documents=texts,
-        embedding=embedding,
-        persist_directory=vectorstore_path
-    )
-    return vectordb
-
-# ========== LCEL Chain ==========
-def answer_question(user_question):
-    # Load vectorstore
-    vectordb = Chroma(
-        persist_directory=f"{working_dir}/doc_vectorstore",
-        embedding_function=embedding
-    )
-    retriever = vectordb.as_retriever()
-
-    # Compose LCEL chain
-    rag_chain = (
-        RunnableMap({
-            "context": lambda x: retriever.invoke(x["question"]),
-            "question": lambda x: x["question"]
-        })
-        | prompt_template
-        | llm
-        | StrOutputParser()
-    )
-
-    # Run
-    result = rag_chain.invoke({"question": user_question})
-    return remove_think_blocks(result)
-
+        # Run
+        result = rag_chain.invoke({"question": user_question})
+        return remove_think_blocks(result)
 # ========== Run Script ==========
 if __name__ == "__main__":
     try:
         print("Processing document to Chroma DB...")
-        # process_document_to_chroma_db(file_name)
+        chat = ArklineAIChat()
+        chat.process_document()
         print("Document processed successfully.")
     except Exception as e:
         print(f"Error processing document: {e}")
@@ -98,7 +89,7 @@ if __name__ == "__main__":
     try:
         test_question = "What is NOAH?"
         print(f"Asking question: {test_question}")
-        answer = answer_question(test_question)
+        answer = chat.answer_question(test_question)
         print(f"Answer: {answer}")
     except Exception as e:
         print(f"Error answering question: {e}")
