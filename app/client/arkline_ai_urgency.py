@@ -18,7 +18,7 @@ class ArklineAI:
                 "properties": {
                     "urgency": {
                         "type": "string",
-                        "enum": ["High", "Medium", "Low"]
+                        "enum": ["High", "Medium", "Low", "Others"]
                     }
                 },
                 "required": ["urgency"]
@@ -52,7 +52,18 @@ class ArklineAI:
         if not response.choices:
             return None
         
-        return extract_clean_json(response.choices[0].message.tool_calls[0].function.arguments) if response.choices[0].message.tool_calls else None
+        # First try to get function call result
+        if response.choices[0].message.tool_calls:
+            return extract_clean_json(response.choices[0].message.tool_calls[0].function.arguments)
+        
+        # Fallback: try to extract JSON from regular message content
+        if response.choices[0].message.content:
+            fallback_result = extract_clean_json(response.choices[0].message.content)
+            if fallback_result and 'urgency' in fallback_result:
+                return fallback_result
+        
+        # Last resort: default to "Others" for any unclassifiable content
+        return {"urgency": "Others"}
 
 
     def __prompt_build(self, subject: str, message: str) -> str:

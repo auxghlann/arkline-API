@@ -21,16 +21,16 @@ class UrgencyResponse(BaseModel):
 def get_urgency(request: UrgencyRequest) -> UrgencyResponse:
     try:
         response = client.get_response(request.subject, request.message)
+        
+        # The client now has fallback logic, so response should always have urgency
         if not response or 'urgency' not in response:
-            raise HTTPException(
-                status_code=HTTP_400_BAD_REQUEST,
-                detail="Invalid response from urgency service."
-            )
+            # This should rarely happen now, but provide a final fallback
+            return UrgencyResponse(urgency="Others")
+            
         return UrgencyResponse(urgency=response['urgency'])
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
-        )
+        # Log the error for debugging but still return a valid response
+        print(f"Urgency classification error: {str(e)}")
+        return UrgencyResponse(urgency="Others")

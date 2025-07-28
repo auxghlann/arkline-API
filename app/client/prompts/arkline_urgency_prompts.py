@@ -6,6 +6,7 @@ SYSTEM_BASE_PROMPT = """
 HIGH URGENCY: Same-day deadlines, urgent signatures needed, time-sensitive compliance requirements, emergency situations
 MEDIUM URGENCY: Requests with 1-3 day deadlines, important but not critical tasks, status updates needed, scheduling within the week
 LOW URGENCY: General inquiries, information requests, flexible scheduling, non-time-sensitive documentation
+OTHERS: Messages that don't fit the above categories, unclear requests, spam, irrelevant content, or administrative notifications
 
 - Classify the intern requests based on urgency. 
 """
@@ -81,5 +82,27 @@ LOW_URGENCY_EXAMPLE = [
     }
 ]
 
+# Others category example
+OTHERS_URGENCY_EXAMPLE = [
+    {
+        "role": "user",
+        "content": """
+            Dear HR Team,
+            
+            I just wanted to take a moment to express my heartfelt gratitude for the wonderful internship experience I've had here. The team has been incredibly supportive, and I've learned so much during my time with the company.
+            
+            Thank you for providing such a positive learning environment and for all the guidance you've given me throughout my internship journey.
+            
+            With sincere appreciation,
+            Sarah Chen
+            Marketing Intern
+        """
+    },
+    {
+        "role": "assistant",
+        "content": """{"urgency": "Others"}"""
+    }
+]
+
 # Combined examples for better training
-BEHAVIOR_FEW_SHOT_MESSAGE = HIGH_URGENCY_EXAMPLE + MEDIUM_URGENCY_EXAMPLE + LOW_URGENCY_EXAMPLE 
+BEHAVIOR_FEW_SHOT_MESSAGE = HIGH_URGENCY_EXAMPLE + MEDIUM_URGENCY_EXAMPLE + LOW_URGENCY_EXAMPLE + OTHERS_URGENCY_EXAMPLE 
